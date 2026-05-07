@@ -21,12 +21,8 @@
 </head>
 <body>
 <div id="root"></div>
-
-<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-<!-- PWA setup -->
 <script>
 const iconSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#0c0f1a"/><text x="256" y="340" text-anchor="middle" font-size="300" font-family="serif">✈</text></svg>`;
 const iconUrl='data:image/svg+xml,'+encodeURIComponent(iconSvg);
@@ -34,15 +30,11 @@ document.getElementById('apple-icon').href=iconUrl;
 document.getElementById('fav-icon').href=iconUrl;
 const mBlob=new Blob([JSON.stringify({name:"出張報告書管理",short_name:"出張管理",start_url:"./",display:"standalone",orientation:"portrait",background_color:"#0c0f1a",theme_color:"#0c0f1a",lang:"ja",icons:[{src:iconUrl,sizes:"512x512",type:"image/svg+xml",purpose:"maskable"}]})],{type:"application/json"});
 document.getElementById('manifest-link').href=URL.createObjectURL(mBlob);
-
-// localStorage for media only
-window._lsMedia = {
-  get: (k) => { try { const v=localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
-  set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
+window._lsMedia={
+  get:(k)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
 };
 </script>
-
-<!-- React (pre-compiled, no Babel needed) -->
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
@@ -52,10 +44,6 @@ const {
   useRef,
   useCallback
 } = React;
-
-// ════════════════════════════════════════════════════════
-//  UTILITIES
-// ════════════════════════════════════════════════════════
 const uid = () => Math.random().toString(36).slice(2, 9);
 const nowISO = () => new Date().toISOString();
 const fmtTime = iso => {
@@ -223,7 +211,7 @@ const openNav = ({
   }
 };
 
-// Media: always localStorage (photos/recordings too large for Firestore)
+// Media: always localStorage
 const loadMedia = async pid => window._lsMedia.get(`media:${pid}`) || {
   photos: [],
   recordings: []
@@ -245,9 +233,7 @@ const ss = async (k, v) => {
   } catch {}
 };
 
-// ════════════════════════════════════════════════════════
-//  FIREBASE HELPERS
-// ════════════════════════════════════════════════════════
+// FIREBASE HELPERS
 let _db = null;
 let _teamId = null;
 const initFirebase = (config, teamId) => {
@@ -275,8 +261,6 @@ const fsaveTvs = async list => {
     list
   });
 };
-
-// Compat shims so TravelerMasterModal works unchanged
 const loadTravelers = async () => {
   try {
     const snap = await tvDoc().get();
@@ -288,19 +272,6 @@ const loadTravelers = async () => {
 const saveTravelers = async list => {
   await fsaveTvs(list);
 };
-
-// Export helpers (read all trips for zip export)
-const floadTrips = async () => {
-  const snap = await tripsCol().get();
-  return snap.docs.map(d => ({
-    ...d.data(),
-    id: d.id
-  }));
-};
-
-// ════════════════════════════════════════════════════════
-//  SETUP SCREEN
-// ════════════════════════════════════════════════════════
 const SETUP_CSS = `
 .setup-wrap{min-height:100vh;background:#0c0f1a;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;color:#e2e8f8}
 .setup-card{background:#12151e;border:1px solid #252d42;border-radius:14px;padding:24px;width:100%;max-width:420px}
@@ -311,12 +282,8 @@ const SETUP_CSS = `
 .setup-inp:focus{border-color:#3b82f6}
 .setup-inp::placeholder{color:#4a5570}
 .setup-btn{width:100%;padding:11px;background:#2563eb;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px}
-.setup-btn:hover{background:#1d4ed8}
 .setup-btn:disabled{opacity:.4;cursor:not-allowed}
 .setup-err{color:#f87171;font-size:13px;margin-top:8px;text-align:center}
-.setup-link{color:#60a5fa;font-size:12px;text-align:center;margin-top:12px;cursor:pointer;text-decoration:underline}
-.setup-step{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:20px}
-.setup-dot{width:8px;height:8px;border-radius:50%}
 `;
 const BAKED_CONFIG = {
   "apiKey": "AIzaSyDombC-mDxM6TC6Eo1Zqu33FkWdagt1xm4",
@@ -378,7 +345,7 @@ function SetupScreen({
     style: {
       color: '#e2e8f8'
     }
-  }, "\u540C\u3058\u30C1\u30FC\u30E0ID"), "\u3092\u5165\u529B\u3059\u308B\u3068\u30C7\u30FC\u30BF\u304C\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u3067\u5171\u6709\u3055\u308C\u307E\u3059\u3002", /*#__PURE__*/React.createElement("br", null), "\u82F1\u6570\u5B57\u30FB\u30CF\u30A4\u30D5\u30F3\u30FB\u30A2\u30F3\u30C0\u30FC\u30B9\u30B3\u30A2\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
+  }, "\u540C\u3058\u30C1\u30FC\u30E0ID"), "\u3092\u5165\u529B\u3059\u308B\u3068\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u3067\u5171\u6709\u3055\u308C\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
     className: "setup-btn",
     onClick: handleStart,
     disabled: !teamCode.trim()
@@ -386,10 +353,6 @@ function SetupScreen({
     className: "setup-err"
   }, err))));
 }
-
-// ════════════════════════════════════════════════════════
-//  UI COMPONENTS (shared with standalone version)
-// ════════════════════════════════════════════════════════
 const PT = {
   departure: {
     label: "出発地",
@@ -2046,7 +2009,8 @@ function TripDetail({
         padding: "0 14px 10px",
         display: "flex",
         gap: 6,
-        flexWrap: "wrap"
+        flexWrap: "wrap",
+        alignItems: "center"
       }
     }, (p.address || p.name) && /*#__PURE__*/React.createElement(Btn, {
       xs: true,
@@ -2058,46 +2022,99 @@ function TripDetail({
       onClick: () => stampNow("actualPassage")
     }, "\u25C6 \u901A\u904E"), isWp && p.actualPassage && /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 11,
-        color: "var(--green)",
-        fontFamily: "monospace",
         display: "flex",
         alignItems: "center",
         gap: 4
       }
-    }, "\u25C6 ", fmtTime(p.actualPassage), " ", /*#__PURE__*/React.createElement(DiffTag, {
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--green)",
+        fontFamily: "monospace"
+      }
+    }, "\u25C6 ", fmtTime(p.actualPassage)), /*#__PURE__*/React.createElement(DiffTag, {
       d: pasDiff
-    })), !isWp && !isArr && !p.actualDeparture && /*#__PURE__*/React.createElement(Btn, {
+    }), /*#__PURE__*/React.createElement(Btn, {
+      xs: true,
+      onClick: () => onUpdate({
+        ...trip,
+        points: trip.points.map(x => x.id === p.id ? {
+          ...x,
+          actualPassage: null
+        } : x)
+      }),
+      style: {
+        fontSize: 10,
+        padding: "1px 5px",
+        opacity: .7
+      }
+    }, "\u2715")), !isWp && !isArr && !p.actualDeparture && /*#__PURE__*/React.createElement(Btn, {
       xs: true,
       cls: "btn-amber",
       onClick: () => stampNow("actualDeparture")
     }, "\u25B2 \u51FA\u767A"), !isWp && !isArr && p.actualDeparture && /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 11,
-        color: "#fbbf24",
-        fontFamily: "monospace",
         display: "flex",
         alignItems: "center",
         gap: 4
       }
-    }, "\u25B2 ", fmtTime(p.actualDeparture), " ", /*#__PURE__*/React.createElement(DiffTag, {
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "#fbbf24",
+        fontFamily: "monospace"
+      }
+    }, "\u25B2 ", fmtTime(p.actualDeparture)), /*#__PURE__*/React.createElement(DiffTag, {
       d: depDiff
-    })), !isWp && !isDep && !p.actualArrival && /*#__PURE__*/React.createElement(Btn, {
+    }), /*#__PURE__*/React.createElement(Btn, {
+      xs: true,
+      onClick: () => onUpdate({
+        ...trip,
+        points: trip.points.map(x => x.id === p.id ? {
+          ...x,
+          actualDeparture: null,
+          stayDuration: null
+        } : x)
+      }),
+      style: {
+        fontSize: 10,
+        padding: "1px 5px",
+        opacity: .7
+      }
+    }, "\u2715")), !isWp && !isDep && !p.actualArrival && /*#__PURE__*/React.createElement(Btn, {
       xs: true,
       cls: "btn-green",
       onClick: () => stampNow("actualArrival")
     }, "\u25BC \u5230\u7740"), !isWp && !isDep && p.actualArrival && /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 11,
-        color: "var(--green)",
-        fontFamily: "monospace",
         display: "flex",
         alignItems: "center",
         gap: 4
       }
-    }, "\u25BC ", fmtTime(p.actualArrival), " ", /*#__PURE__*/React.createElement(DiffTag, {
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--green)",
+        fontFamily: "monospace"
+      }
+    }, "\u25BC ", fmtTime(p.actualArrival)), /*#__PURE__*/React.createElement(DiffTag, {
       d: arrDiff
-    }))), i < pts.length - 1 && /*#__PURE__*/React.createElement("div", {
+    }), /*#__PURE__*/React.createElement(Btn, {
+      xs: true,
+      onClick: () => onUpdate({
+        ...trip,
+        points: trip.points.map(x => x.id === p.id ? {
+          ...x,
+          actualArrival: null,
+          stayDuration: null
+        } : x)
+      }),
+      style: {
+        fontSize: 10,
+        padding: "1px 5px",
+        opacity: .7
+      }
+    }, "\u2715"))), i < pts.length - 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         width: 2,
         height: 12,
@@ -2664,12 +2681,7 @@ function PointDetail({
     onClose: () => setShowAddr(false)
   }));
 }
-
-// ════════════════════════════════════════════════════════
-//  APP (Firebase-backed)
-// ════════════════════════════════════════════════════════
 function App() {
-  // ── Setup state ──────────────────────────────────────
   const [setupDone, setSetupDone] = useState(false);
   const [teamId, setTeamId] = useState('');
   useEffect(() => {
@@ -2682,22 +2694,19 @@ function App() {
       }
     }
   }, []);
-  const handleSetupComplete = (cfg, team) => {
-    setTeamId(team);
-    setSetupDone(true);
-  };
-  const resetSetup = () => {
-    localStorage.removeItem('fb_config');
-    localStorage.removeItem('fb_team');
-    setSetupDone(false);
-    setTeamId('');
-  };
   if (!setupDone) return /*#__PURE__*/React.createElement(SetupScreen, {
-    onComplete: handleSetupComplete
+    onComplete: (cfg, team) => {
+      setTeamId(team);
+      setSetupDone(true);
+    }
   });
   return /*#__PURE__*/React.createElement(MainApp, {
     teamId: teamId,
-    onResetSetup: resetSetup
+    onResetSetup: () => {
+      localStorage.removeItem('fb_team');
+      setSetupDone(false);
+      setTeamId('');
+    }
   });
 }
 function MainApp({
@@ -2716,8 +2725,6 @@ function MainApp({
   const [online, setOnline] = useState(true);
   const [ready, setReady] = useState(false);
   const importRef = useRef(null);
-
-  // ── Firestore real-time listeners ────────────────────
   useEffect(() => {
     if (!_db) return;
     const unsubTrips = tripsCol().onSnapshot(snap => {
@@ -2767,8 +2774,6 @@ function MainApp({
     setTrips(p => p.filter(t => t.id !== id));
     await fdeleteTrip(id);
   };
-
-  // ── Export ───────────────────────────────────────────
   const exportTrips = async targetTrips => {
     const tripsWithMedia = await Promise.all(targetTrips.map(async t => {
       const media = {};
@@ -2793,14 +2798,11 @@ function MainApp({
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const label = targetTrips.length === 1 ? targetTrips[0].name : `出張データ_${new Date().toISOString().slice(0, 10)}`;
     a.href = url;
-    a.download = `${label}.json`;
+    a.download = `${targetTrips.length === 1 ? targetTrips[0].name : `出張データ_${new Date().toISOString().slice(0, 10)}`}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  // ── Import ───────────────────────────────────────────
   const handleImportFile = file => {
     const reader = new FileReader();
     reader.onload = async e => {
@@ -2816,8 +2818,8 @@ function MainApp({
         let addedTrips = 0,
           updatedTrips = 0,
           addedTv = 0;
-        const currentIds = trips.map(t => t.id);
-        const currentNames = travelers.map(x => x.name);
+        const currentIds = trips.map(t => t.id),
+          currentNames = travelers.map(x => x.name);
         const newTvs = [...travelers];
         for (const tv of data.travelers || []) {
           if (!currentNames.includes(tv.name)) {
@@ -2938,7 +2940,7 @@ function MainApp({
       fontSize: 12,
       color: "var(--text3)"
     }
-  }, "\u73FE\u5728\u306E\u30C1\u30FC\u30E0: ", /*#__PURE__*/React.createElement("strong", {
+  }, " \u73FE\u5728\u306E\u30C1\u30FC\u30E0: ", /*#__PURE__*/React.createElement("strong", {
     style: {
       color: "var(--text)"
     }
@@ -2947,7 +2949,7 @@ function MainApp({
       fontSize: 11,
       color: "var(--text3)"
     }
-  }, "\u5199\u771F\u30FB\u9332\u97F3\u306F\u3053\u306E\u30C7\u30D0\u30A4\u30B9\u306B\u306E\u307F\u4FDD\u5B58\u3055\u308C\u307E\u3059"), /*#__PURE__*/React.createElement("div", {
+  }, " \u5199\u771F\u30FB\u9332\u97F3\u306F\u3053\u306E\u30C7\u30D0\u30A4\u30B9\u306B\u306E\u307F\u4FDD\u5B58\u3055\u308C\u307E\u3059"), /*#__PURE__*/React.createElement("div", {
     className: "row",
     style: {
       gap: 6
@@ -3013,12 +3015,7 @@ function MainApp({
     travelers: travelers,
     onOpenMaster: () => setShowMaster(true)
   }), showMaster && /*#__PURE__*/React.createElement(TravelerMasterModal, {
-    onClose: async () => {
-      setShowMaster(false);
-    },
-    overrideSave: async list => {
-      await fsaveTvs(list);
-    }
+    onClose: async () => setShowMaster(false)
   }), /*#__PURE__*/React.createElement("input", {
     ref: importRef,
     type: "file",
@@ -3032,9 +3029,9 @@ function MainApp({
     }
   })));
 }
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(App));
 
+const root=ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
 </script>
 </body>
 </html>
