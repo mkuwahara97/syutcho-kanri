@@ -1729,7 +1729,11 @@ function TripDetail({
     cls: "btn-ghost",
     sm: true,
     onClick: () => setStatus("completed")
-  }, "\u2713 \u5B8C\u4E86")))), /*#__PURE__*/React.createElement("div", {
+  }, "\u2713 \u5B8C\u4E86"), trip.status === "completed" && /*#__PURE__*/React.createElement(Btn, {
+    cls: "btn-ghost",
+    sm: true,
+    onClick: () => setStatus("active")
+  }, "\u21A9 \u9032\u884C\u4E2D\u306B\u623B\u3059")))), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "8px 14px",
       display: "flex",
