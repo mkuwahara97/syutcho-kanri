@@ -10,10 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
 const _s=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='#0c0f1a'/><text x='256' y='340' text-anchor='middle' font-size='300' font-family='serif'>✈</text></svg>`;
-const _i='data:image/svg+xml,'+encodeURIComponent(_s);
-document.getElementById('apple-icon').href=_i;document.getElementById('fav-icon').href=_i;
-const _m=new Blob([JSON.stringify({name:"出張報告書管理",short_name:"出張管理",start_url:"./",display:"standalone",background_color:"#0c0f1a",theme_color:"#0c0f1a",lang:"ja",icons:[{src:_i,sizes:"512x512",type:"image/svg+xml",purpose:"maskable"}]})],{type:"application/json"});
-document.getElementById('manifest-link').href=URL.createObjectURL(_m);
+const _i='data:image/svg+xml,'+encodeURIComponent(_s);document.getElementById('apple-icon').href=_i;document.getElementById('fav-icon').href=_i;
+const _m=new Blob([JSON.stringify({name:"出張報告書管理",short_name:"出張管理",start_url:"./",display:"standalone",background_color:"#0c0f1a",theme_color:"#0c0f1a",lang:"ja",icons:[{src:_i,sizes:"512x512",type:"image/svg+xml",purpose:"maskable"}]})],{type:"application/json"});document.getElementById("manifest-link").href=URL.createObjectURL(_m);
 window._lsMedia={get:(k)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
 </script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -192,6 +190,47 @@ const multiSearch = async q => {
     }
   }
   return merged.slice(0, 12);
+};
+const ensureLamejs = () => new Promise((resolve, reject) => {
+  if (window.lamejs) {
+    resolve();
+    return;
+  }
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
+  s.onload = resolve;
+  s.onerror = () => reject(new Error('lamejs load failed'));
+  document.head.appendChild(s);
+});
+const convertToMp3 = async webmBlob => {
+  await ensureLamejs();
+  const arrayBuffer = await webmBlob.arrayBuffer();
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  audioCtx.close();
+  const ch = audioBuffer.numberOfChannels;
+  const sr = audioBuffer.sampleRate;
+  const enc = new lamejs.Mp3Encoder(ch === 1 ? 1 : 2, sr, 128);
+  const mp3 = [];
+  const blockSize = 1152;
+  const toInt16 = f32 => {
+    const i16 = new Int16Array(f32.length);
+    for (let i = 0; i < f32.length; i++) i16[i] = Math.max(-32768, Math.min(32767, f32[i] * 32767));
+    return i16;
+  };
+  const L = audioBuffer.getChannelData(0);
+  const R = ch > 1 ? audioBuffer.getChannelData(1) : L;
+  for (let i = 0; i < L.length; i += blockSize) {
+    const lc = L.subarray(i, i + blockSize);
+    const rc = R.subarray(i, i + blockSize);
+    const buf = ch > 1 ? enc.encodeBuffer(toInt16(lc), toInt16(rc)) : enc.encodeBuffer(toInt16(lc));
+    if (buf.length > 0) mp3.push(buf);
+  }
+  const tail = enc.flush();
+  if (tail.length > 0) mp3.push(tail);
+  return new Blob(mp3, {
+    type: 'audio/mp3'
+  });
 };
 const openNav = ({
   address,
@@ -2176,6 +2215,7 @@ function PointDetail({
   });
   const [isRec, setIsRec] = useState(false);
   const [recDur, setRecDur] = useState(0);
+  const [isConverting, setIsConverting] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [showAddr, setShowAddr] = useState(false);
   const [localMemo, setLocalMemo] = useState(point.memo || "");
@@ -2254,27 +2294,51 @@ function PointDetail({
     const mr = mrRef.current;
     if (!mr) return;
     const dur = recDur;
-    mr.onstop = () => {
+    mr.onstop = async () => {
       clearInterval(timerRef.current);
-      const blob = new Blob(chunksRef.current, {
+      setIsRec(false);
+      setRecDur(0);
+      setIsConverting(true);
+      const webmBlob = new Blob(chunksRef.current, {
         type: "audio/webm"
       });
-      const reader = new FileReader();
-      reader.onload = e => {
-        const rec = {
-          id: uid(),
-          data: e.target.result,
-          dur,
-          ts: nowISO()
+      try {
+        const mp3Blob = await convertToMp3(webmBlob);
+        const reader = new FileReader();
+        reader.onload = e => {
+          const rec = {
+            id: uid(),
+            data: e.target.result,
+            dur,
+            ts: nowISO(),
+            fmt: 'mp3'
+          };
+          updMedia(prev => ({
+            ...prev,
+            recordings: [...prev.recordings, rec]
+          }));
+          setIsConverting(false);
         };
-        updMedia(prev => ({
-          ...prev,
-          recordings: [...prev.recordings, rec]
-        }));
-        setIsRec(false);
-        setRecDur(0);
-      };
-      reader.readAsDataURL(blob);
+        reader.readAsDataURL(mp3Blob);
+      } catch {
+        // lamejs失敗時はwebmで保存
+        const reader = new FileReader();
+        reader.onload = e => {
+          const rec = {
+            id: uid(),
+            data: e.target.result,
+            dur,
+            ts: nowISO(),
+            fmt: 'webm'
+          };
+          updMedia(prev => ({
+            ...prev,
+            recordings: [...prev.recordings, rec]
+          }));
+          setIsConverting(false);
+        };
+        reader.readAsDataURL(webmBlob);
+      }
     };
     mr.stop();
     mr.stream.getTracks().forEach(t => t.stop());
@@ -2668,7 +2732,7 @@ function PointDetail({
       color: "var(--text3)",
       fontSize: 13
     }
-  }, "\u5199\u771F\u304C\u3042\u308A\u307E\u305B\u3093") : /*#__PURE__*/React.createElement("div", {
+  }, "\u5199\u771F\u304C\u3042\u308A\u307E\u305B\u3093") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "photo-grid"
   }, media.photos.map(ph => /*#__PURE__*/React.createElement("div", {
     key: ph.id,
@@ -2677,14 +2741,33 @@ function PointDetail({
     src: ph.data,
     className: "photo-img",
     alt: "",
-    onClick: () => setLightbox(ph.data)
+    onClick: () => setLightbox({
+      data: ph.data,
+      id: ph.id,
+      ts: ph.ts
+    })
   }), /*#__PURE__*/React.createElement("button", {
     className: "photo-del",
     onClick: () => updMedia(m => ({
       ...m,
       photos: m.photos.filter(p => p.id !== ph.id)
     }))
-  }, "\u2715")))))), /*#__PURE__*/React.createElement("div", {
+  }, "\u2715")))), /*#__PURE__*/React.createElement(Btn, {
+    cls: "btn-ghost",
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      marginTop: 8
+    },
+    onClick: () => {
+      media.photos.forEach((ph, i) => {
+        const a = document.createElement('a');
+        a.href = ph.data;
+        a.download = `${point.name || 'photo'}_${i + 1}_${(ph.ts || '').slice(0, 10)}.jpg`;
+        a.click();
+      });
+    }
+  }, "\u2B07 \u5199\u771F\u3092\u3059\u3079\u3066\u4FDD\u5B58")))), /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "sec-title",
@@ -2693,13 +2776,55 @@ function PointDetail({
       alignItems: "center",
       justifyContent: "space-between"
     }
-  }, /*#__PURE__*/React.createElement("span", null, "\u9332\u97F3 (", media.recordings.length, ")"), !isRec ? /*#__PURE__*/React.createElement(Btn, {
+  }, /*#__PURE__*/React.createElement("span", null, "\u9332\u97F3 (", media.recordings.length, ")"), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 5,
+      marginLeft: "auto"
+    }
+  }, media.recordings.some(r => r.fmt !== 'mp3') && !isConverting && !isRec && /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    cls: "btn-amber",
+    onClick: async () => {
+      setIsConverting(true);
+      const updated = [...media.recordings];
+      for (let i = 0; i < updated.length; i++) {
+        if (updated[i].fmt === 'mp3') continue;
+        try {
+          const res = await fetch(updated[i].data);
+          const blob = await res.blob();
+          const mp3Blob = await convertToMp3(blob);
+          const b64 = await new Promise(r => {
+            const fr = new FileReader();
+            fr.onload = e => r(e.target.result);
+            fr.readAsDataURL(mp3Blob);
+          });
+          updated[i] = {
+            ...updated[i],
+            data: b64,
+            fmt: 'mp3'
+          };
+        } catch {}
+      }
+      updMedia(() => {
+        const n = {
+          ...media,
+          recordings: updated
+        };
+        return n;
+      });
+      setIsConverting(false);
+    }
+  }, "\uD83D\uDD04 MP3\u306B\u5909\u63DB"), isConverting ? /*#__PURE__*/React.createElement("span", {
+    className: "pulse",
+    style: {
+      color: "var(--amber)",
+      fontSize: 12
+    }
+  }, "\u25CF MP3\u5909\u63DB\u4E2D\u2026") : !isRec ? /*#__PURE__*/React.createElement(Btn, {
     cls: "btn-red",
     xs: true,
-    onClick: startRec,
-    style: {
-      margin: "0 0 0 auto"
-    }
+    onClick: startRec
   }, "\uD83C\uDF99 \u9332\u97F3\u958B\u59CB") : /*#__PURE__*/React.createElement("div", {
     className: "row",
     style: {
@@ -2714,16 +2839,16 @@ function PointDetail({
   }, "\u25CF ", fmtRecTime(recDur)), /*#__PURE__*/React.createElement(Btn, {
     xs: true,
     onClick: stopRec
-  }, "\u25A0 \u505C\u6B62"))), /*#__PURE__*/React.createElement("div", {
+  }, "\u25A0 \u505C\u6B62")))), /*#__PURE__*/React.createElement("div", {
     className: "card-body"
-  }, media.recordings.length === 0 && !isRec ? /*#__PURE__*/React.createElement("div", {
+  }, media.recordings.length === 0 && !isRec && !isConverting ? /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "12px 0",
       color: "var(--text3)",
       fontSize: 13
     }
-  }, "\u9332\u97F3\u304C\u3042\u308A\u307E\u305B\u3093") : media.recordings.map(rec => /*#__PURE__*/React.createElement("div", {
+  }, "\u9332\u97F3\u304C\u3042\u308A\u307E\u305B\u3093") : media.recordings.map((rec, i) => /*#__PURE__*/React.createElement("div", {
     key: rec.id,
     className: "rec-item"
   }, /*#__PURE__*/React.createElement("span", {
@@ -2744,19 +2869,54 @@ function PointDetail({
       color: "var(--text3)",
       marginTop: 3
     }
-  }, fmtDateTime(rec.ts), " \xB7 ", fmtRecTime(rec.dur))), /*#__PURE__*/React.createElement(Btn, {
+  }, fmtDateTime(rec.ts), " \xB7 ", fmtRecTime(rec.dur), rec.fmt && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 5,
+      color: "var(--accent)",
+      fontWeight: 700
+    }
+  }, rec.fmt.toUpperCase()))), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    onClick: () => {
+      const a = document.createElement('a');
+      a.href = rec.data;
+      a.download = `${point.name || 'rec'}_${i + 1}_${(rec.ts || '').slice(0, 10)}.${rec.fmt || 'mp3'}`;
+      a.click();
+    }
+  }, "\u2B07"), /*#__PURE__*/React.createElement(Btn, {
     xs: true,
     onClick: () => updMedia(m => ({
       ...m,
       recordings: m.recordings.filter(r => r.id !== rec.id)
     }))
-  }, "\uD83D\uDDD1"))))), lightbox && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDDD1")))))), lightbox && /*#__PURE__*/React.createElement("div", {
     className: "lightbox",
     onClick: () => setLightbox(null)
   }, /*#__PURE__*/React.createElement("img", {
-    src: lightbox,
+    src: lightbox.data,
     alt: ""
-  })), showAddr && /*#__PURE__*/React.createElement(AddrSearchModal, {
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      bottom: 24,
+      right: 24
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement(Btn, {
+    cls: "btn-blue",
+    sm: true,
+    onClick: () => {
+      const a = document.createElement('a');
+      a.href = lightbox.data;
+      a.download = `${point.name || 'photo'}_${(lightbox.ts || '').slice(0, 10)}.jpg`;
+      a.click();
+    }
+  }, "\u2B07 \u4FDD\u5B58"))), showAddr && /*#__PURE__*/React.createElement(AddrSearchModal, {
     onSelect: r => {
       upd({
         address: r.address,
