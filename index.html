@@ -1,10 +1,7 @@
 <!DOCTYPE html><html lang="ja"><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#0c0f1a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="出張管理">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0c0f1a"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="出張管理">
 <title>出張報告書管理</title>
 <link rel="apple-touch-icon" id="apple-icon"><link rel="icon" id="fav-icon"><link rel="manifest" id="manifest-link">
 <style>*{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}html,body{height:100%;margin:0;background:#0c0f1a;overscroll-behavior:none}#root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}.hdr{padding-top:max(13px,env(safe-area-inset-top))!important}input,select,textarea{font-size:16px!important}</style>
@@ -12,11 +9,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
-const _svg=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='#0c0f1a'/><text x='256' y='340' text-anchor='middle' font-size='300' font-family='serif'>✈</text></svg>`;
-const _icon='data:image/svg+xml,'+encodeURIComponent(_svg);
-document.getElementById('apple-icon').href=_icon;document.getElementById('fav-icon').href=_icon;
-const _mb=new Blob([JSON.stringify({name:"出張報告書管理",short_name:"出張管理",start_url:"./",display:"standalone",background_color:"#0c0f1a",theme_color:"#0c0f1a",lang:"ja",icons:[{src:_icon,sizes:"512x512",type:"image/svg+xml",purpose:"maskable"}]})],{type:"application/json"});
-document.getElementById('manifest-link').href=URL.createObjectURL(_mb);
+const _s=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='#0c0f1a'/><text x='256' y='340' text-anchor='middle' font-size='300' font-family='serif'>✈</text></svg>`;
+const _i='data:image/svg+xml,'+encodeURIComponent(_s);
+document.getElementById('apple-icon').href=_i;document.getElementById('fav-icon').href=_i;
+const _m=new Blob([JSON.stringify({name:"出張報告書管理",short_name:"出張管理",start_url:"./",display:"standalone",background_color:"#0c0f1a",theme_color:"#0c0f1a",lang:"ja",icons:[{src:_i,sizes:"512x512",type:"image/svg+xml",purpose:"maskable"}]})],{type:"application/json"});
+document.getElementById('manifest-link').href=URL.createObjectURL(_m);
 window._lsMedia={get:(k)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
 </script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -122,7 +119,7 @@ const searchZipcloud = async zip => {
 };
 const searchNominatim = async q => {
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=0&countrycodes=jp`, {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=0`, {
       headers: {
         "Accept-Language": "ja,en"
       },
@@ -140,35 +137,55 @@ const searchNominatim = async q => {
     return [];
   }
 };
-const reverseGeocode = async (lat, lng) => {
+const searchOverpass = async q => {
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ja`, {
+    const esc = q.replace(/["\[\]()\\]/g, '').trim();
+    const data = `[out:json][timeout:15];(nwr["name"~"${esc}",i](24.0,122.0,46.0,148.0););out center 8;`;
+    const r = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
       headers: {
-        "Accept-Language": "ja,en"
+        'Content-Type': 'application/x-www-form-urlencoded'
       },
-      signal: AbortSignal.timeout(6000)
+      body: 'data=' + encodeURIComponent(data),
+      signal: AbortSignal.timeout(15000)
     });
-    if (!r.ok) return null;
+    if (!r.ok) return [];
     const d = await r.json();
-    return d.display_name || null;
+    return (d.elements || []).slice(0, 8).map(e => {
+      const lat = e.lat ?? e.center?.lat;
+      const lng = e.lon ?? e.center?.lon;
+      if (!lat || !lng) return null;
+      const name = e.tags?.name || q;
+      const pref = e.tags?.['addr:province'] || e.tags?.['addr:prefecture'] || '';
+      const city = e.tags?.['addr:city'] || e.tags?.['addr:district'] || '';
+      const street = e.tags?.['addr:street'] || '';
+      const num = e.tags?.['addr:housenumber'] || '';
+      const addrStr = [pref, city, street, num].filter(Boolean).join('');
+      return {
+        address: name + (addrStr ? `（${addrStr}）` : ''),
+        lat,
+        lng,
+        source: "施設"
+      };
+    }).filter(Boolean);
   } catch {
-    return null;
+    return [];
   }
 };
 const multiSearch = async q => {
   if (POSTAL_RE.test(q.trim())) {
     const zip = await searchZipcloud(q.trim());
     if (zip.length > 0) return zip;
-    // zipcloudがCORSでブロックされた場合はNominatimでフォールバック
     return searchNominatim(q + " 日本");
   }
-  const [gsi, osm] = await Promise.allSettled([searchGSI(q), searchNominatim(q)]);
+  const [gsi, osm, facility] = await Promise.allSettled([searchGSI(q), searchNominatim(q), searchOverpass(q)]);
   const gsiR = gsi.status === "fulfilled" ? gsi.value : [];
   const osmR = osm.status === "fulfilled" ? osm.value : [];
+  const facilityR = facility.status === "fulfilled" ? facility.value : [];
   const seen = new Set();
   const merged = [];
-  for (const r of [...gsiR, ...osmR]) {
-    const key = r.address.slice(0, 18);
+  for (const r of [...facilityR, ...gsiR, ...osmR]) {
+    const key = r.address.slice(0, 20);
     if (!seen.has(key)) {
       seen.add(key);
       merged.push(r);
@@ -484,7 +501,8 @@ const SRC_COLOR = {
   "国土地理院": "#60a5fa",
   "〒": "#4ade80",
   "OSM": "#c084fc",
-  "現在地": "#fb923c"
+  "現在地": "#fb923c",
+  "施設": "#f59e0b"
 };
 function AddrSearchModal({
   onSelect,
@@ -632,7 +650,15 @@ function AddrSearchModal({
     style: {
       color: "var(--text2)"
     }
-  }, "\uD83D\uDCCD \u53D6\u5F97\u4E2D\u2026") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCCD"), /*#__PURE__*/React.createElement("span", null, "\u73FE\u5728\u5730\u304B\u3089\u4F4F\u6240\u3092\u53D6\u5F97"))), loading && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCCD \u53D6\u5F97\u4E2D\u2026") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCCD"), /*#__PURE__*/React.createElement("span", null, "\u73FE\u5728\u5730\u304B\u3089\u4F4F\u6240\u3092\u53D6\u5F97"))), /*#__PURE__*/React.createElement(Btn, {
+    cls: "btn-ghost",
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      gap: 6
+    },
+    onClick: () => window.open(`https://www.google.com/maps/search/${encodeURIComponent(q || '')}`, '_blank')
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDDFA"), /*#__PURE__*/React.createElement("span", null, "Google\u30DE\u30C3\u30D7\u3067\u691C\u7D22\u3057\u3066\u78BA\u8A8D")), loading && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "8px 0",
@@ -645,7 +671,7 @@ function AddrSearchModal({
     }
   }, /*#__PURE__*/React.createElement("span", {
     className: "pulse"
-  }, "\u25CF"), isPostal ? "郵便番号を検索中…" : "国土地理院・OSM を検索中…"), error && !loading && /*#__PURE__*/React.createElement("div", {
+  }, "\u25CF"), isPostal ? "郵便番号を検索中…" : "住所・施設名を検索中…（施設名は15秒ほどかかる場合があります）"), error && !loading && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "8px 10px",
       background: "rgba(248,113,113,.08)",
@@ -755,6 +781,9 @@ function AddrSearchModal({
   }, {
     c: "#c084fc",
     s: "OSM"
+  }, {
+    c: "#f59e0b",
+    s: "施設名"
   }].map(({
     c,
     s
@@ -773,7 +802,7 @@ function AddrSearchModal({
       marginLeft: "auto",
       alignSelf: "center"
     }
-  }, "3\u30BD\u30FC\u30B9\u4E26\u884C\u691C\u7D22"))));
+  }, "4\u30BD\u30FC\u30B9\u4E26\u884C\u691C\u7D22"))));
 }
 function TravelerMasterModal({
   onClose
@@ -2445,26 +2474,45 @@ function PointDetail({
       marginTop: 8
     },
     onClick: () => stamp("actualPassage")
-  }, "\u25C6 \u901A\u904E\u6253\u523B"), point.actualPassage && /*#__PURE__*/React.createElement(Btn, {
-    xs: true,
+  }, "\u25C6 \u4ECA\u3059\u3050\u6253\u523B"), /*#__PURE__*/React.createElement("div", {
+    className: "row",
     style: {
-      width: "100%",
-      justifyContent: "center",
-      marginTop: 4
+      marginTop: 6,
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    className: "inp",
+    style: {
+      flex: 1,
+      textAlign: "center"
     },
+    value: fmtTime(point.actualPassage) === "--:--" ? "" : fmtTime(point.actualPassage),
+    onChange: e => {
+      if (e.target.value) {
+        const [h, m] = e.target.value.split(':').map(Number);
+        const b = point.actualPassage ? new Date(point.actualPassage) : new Date();
+        upd({
+          actualPassage: new Date(b.getFullYear(), b.getMonth(), b.getDate(), h, m).toISOString()
+        });
+      }
+    },
+    placeholder: "\u624B\u52D5\u5165\u529B"
+  }), point.actualPassage && /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
     onClick: () => upd({
       actualPassage: null
     })
-  }, "\u30AF\u30EA\u30A2")) : /*#__PURE__*/React.createElement("div", {
+  }, "\u2715"))) : /*#__PURE__*/React.createElement("div", {
     className: isDep || isArr ? "" : "g2"
   }, !isDep && /*#__PURE__*/React.createElement("div", {
     className: "time-box",
-    style: isDep || isArr ? {
+    style: isArr ? {
       marginBottom: 10
     } : {}
   }, /*#__PURE__*/React.createElement("div", {
     className: "time-lbl"
-  }, isArr ? "実際 到着" : "実際 到着"), /*#__PURE__*/React.createElement("div", {
+  }, "\u5B9F\u969B \u5230\u7740"), /*#__PURE__*/React.createElement("div", {
     className: "time-val"
   }, fmtTime(point.actualArrival)), /*#__PURE__*/React.createElement(DiffBadge, {
     d: arrDiff
@@ -2477,21 +2525,44 @@ function PointDetail({
       marginTop: 8
     },
     onClick: () => stamp("actualArrival")
-  }, "\u25BC \u5230\u7740\u6253\u523B"), point.actualArrival && /*#__PURE__*/React.createElement(Btn, {
-    xs: true,
+  }, "\u25BC \u4ECA\u3059\u3050\u6253\u523B"), /*#__PURE__*/React.createElement("div", {
+    className: "row",
     style: {
-      width: "100%",
-      justifyContent: "center",
-      marginTop: 4
+      marginTop: 6,
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    className: "inp",
+    style: {
+      flex: 1,
+      textAlign: "center"
     },
+    value: fmtTime(point.actualArrival) === "--:--" ? "" : fmtTime(point.actualArrival),
+    onChange: e => {
+      if (e.target.value) {
+        const [h, m] = e.target.value.split(':').map(Number);
+        const b = point.actualArrival ? new Date(point.actualArrival) : new Date();
+        const t = new Date(b.getFullYear(), b.getMonth(), b.getDate(), h, m).toISOString();
+        const changes = {
+          actualArrival: t
+        };
+        if (point.actualDeparture) changes.stayDuration = stayMin(t, point.actualDeparture);
+        upd(changes);
+      }
+    },
+    placeholder: "\u624B\u52D5\u5165\u529B"
+  }), point.actualArrival && /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
     onClick: () => upd({
-      actualArrival: null
+      actualArrival: null,
+      stayDuration: null
     })
-  }, "\u30AF\u30EA\u30A2")), !isArr && /*#__PURE__*/React.createElement("div", {
+  }, "\u2715"))), !isArr && /*#__PURE__*/React.createElement("div", {
     className: "time-box"
   }, /*#__PURE__*/React.createElement("div", {
     className: "time-lbl"
-  }, isDep ? "実際 出発" : "実際 出発"), /*#__PURE__*/React.createElement("div", {
+  }, "\u5B9F\u969B \u51FA\u767A"), /*#__PURE__*/React.createElement("div", {
     className: "time-val"
   }, fmtTime(point.actualDeparture)), /*#__PURE__*/React.createElement(DiffBadge, {
     d: depDiff
@@ -2504,17 +2575,40 @@ function PointDetail({
       marginTop: 8
     },
     onClick: () => stamp("actualDeparture")
-  }, "\u25B2 \u51FA\u767A\u6253\u523B"), point.actualDeparture && /*#__PURE__*/React.createElement(Btn, {
-    xs: true,
+  }, "\u25B2 \u4ECA\u3059\u3050\u6253\u523B"), /*#__PURE__*/React.createElement("div", {
+    className: "row",
     style: {
-      width: "100%",
-      justifyContent: "center",
-      marginTop: 4
+      marginTop: 6,
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    className: "inp",
+    style: {
+      flex: 1,
+      textAlign: "center"
     },
+    value: fmtTime(point.actualDeparture) === "--:--" ? "" : fmtTime(point.actualDeparture),
+    onChange: e => {
+      if (e.target.value) {
+        const [h, m] = e.target.value.split(':').map(Number);
+        const b = point.actualDeparture ? new Date(point.actualDeparture) : new Date();
+        const t = new Date(b.getFullYear(), b.getMonth(), b.getDate(), h, m).toISOString();
+        const changes = {
+          actualDeparture: t
+        };
+        if (point.actualArrival) changes.stayDuration = stayMin(point.actualArrival, t);
+        upd(changes);
+      }
+    },
+    placeholder: "\u624B\u52D5\u5165\u529B"
+  }), point.actualDeparture && /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
     onClick: () => upd({
-      actualDeparture: null
+      actualDeparture: null,
+      stayDuration: null
     })
-  }, "\u30AF\u30EA\u30A2"))), stay !== null && /*#__PURE__*/React.createElement("div", {
+  }, "\u2715")))), stay !== null && /*#__PURE__*/React.createElement("div", {
     className: "stay-bar"
   }, /*#__PURE__*/React.createElement("span", {
     style: {
