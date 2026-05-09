@@ -326,7 +326,9 @@ const loadPackingMaster = async () => {
   }
 };
 const savePackingMaster = async m => {
-  await pmDoc().set(m);
+  try {
+    await pmDoc().set(m);
+  } catch {}
 };
 const masterToChecklist = master => ({
   bags: (master.bags || []).map(b => ({
@@ -3541,13 +3543,13 @@ function MainApp({
   onReset
 }) {
   const [trips, setTrips] = useState([]);
-  const [showPackingMaster, setShowPackingMaster] = useState(false);
   const [travelers, setTravelers] = useState([]);
   const [screen, setScreen] = useState("list");
   const [tripId, setTripId] = useState(null);
   const [pointId, setPointId] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [showMaster, setShowMaster] = useState(false);
+  const [showPackingMaster, setShowPackingMaster] = useState(false);
   const [showTeamMenu, setShowTeamMenu] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
   const [online, setOnline] = useState(true);
@@ -3585,13 +3587,16 @@ function MainApp({
     date,
     travelerIds
   }) => {
+    const master = await loadPackingMaster();
+    const checklist = masterToChecklist(master);
     const t = {
       id: uid(),
       name,
       date,
       status: "planned",
       points: [],
-      travelerIds: travelerIds || []
+      travelerIds: travelerIds || [],
+      checklist
     };
     await fsaveTrip(t);
     setTripId(t.id);
@@ -3823,6 +3828,7 @@ function MainApp({
     },
     onRemove: removeTrip,
     onOpenMaster: () => setShowMaster(true),
+    onOpenPacking: () => setShowPackingMaster(true),
     onExportAll: () => exportTrips(trips),
     onImport: () => importRef.current?.click()
   }), screen === "trip" && trip && /*#__PURE__*/React.createElement(TripDetail, {
@@ -3846,6 +3852,8 @@ function MainApp({
     onOpenMaster: () => setShowMaster(true)
   }), showMaster && /*#__PURE__*/React.createElement(TravelerMasterModal, {
     onClose: async () => setShowMaster(false)
+  }), showPackingMaster && /*#__PURE__*/React.createElement(PackingMasterModal, {
+    onClose: () => setShowPackingMaster(false)
   }), /*#__PURE__*/React.createElement("input", {
     ref: importRef,
     type: "file",
