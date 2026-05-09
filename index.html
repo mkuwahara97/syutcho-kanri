@@ -47,11 +47,17 @@ const diffMin = (planned, actual) => {
   const p = new Date(a.getFullYear(), a.getMonth(), a.getDate(), h, m);
   return Math.round((a - p) / 60000);
 };
-const stayMin = (a, b) => !a || !b ? null : Math.round((new Date(b) - new Date(a)) / 60000);
+const stayMin = (a, b) => {
+  if (!a || !b) return null;
+  let diff = Math.round((new Date(b) - new Date(a)) / 60000);
+  if (diff < 0) diff += 24 * 60; // 日付跨ぎ（0時またぎ）対応
+  return diff >= 0 ? diff : null;
+};
 const fmtMin = m => {
   if (m === null || m === undefined) return null;
-  if (Math.abs(m) < 60) return `${m}分`;
-  return `${Math.floor(Math.abs(m) / 60)}時間${Math.abs(m) % 60}分`;
+  if (m < 0) return "※時刻を確認";
+  if (m < 60) return `${m}分`;
+  return `${Math.floor(m / 60)}時間${m % 60}分`;
 };
 const fmtRecTime = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 const compress = (file, max = 800) => new Promise(res => {
@@ -2233,6 +2239,10 @@ function PointDetail({
     setLocalMemo(point.memo || "");
   }, [point.id]);
   useEffect(() => () => clearInterval(timerRef.current), []);
+  const ld = iso => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
   const upd = useCallback(changes => {
     const np = {
       ...point,
@@ -2539,35 +2549,54 @@ function PointDetail({
     },
     onClick: () => stamp("actualPassage")
   }, "\u25C6 \u4ECA\u3059\u3050\u6253\u523B"), /*#__PURE__*/React.createElement("div", {
-    className: "row",
     style: {
       marginTop: 6,
-      gap: 6
+      display: "flex",
+      flexDirection: "column",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "inp",
+    style: {
+      textAlign: "center",
+      fontSize: 12
+    },
+    value: point.actualPassage ? ld(point.actualPassage) : trip.date || "",
+    onChange: e => {
+      if (!e.target.value) return;
+      const [y, mo, d] = e.target.value.split('-').map(Number);
+      const ex = point.actualPassage ? new Date(point.actualPassage) : new Date();
+      upd({
+        actualPassage: new Date(y, mo - 1, d, ex.getHours(), ex.getMinutes()).toISOString()
+      });
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 4
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: "time",
-    className: "inp",
+    className: "inp flex1",
     style: {
-      flex: 1,
       textAlign: "center"
     },
     value: fmtTime(point.actualPassage) === "--:--" ? "" : fmtTime(point.actualPassage),
     onChange: e => {
-      if (e.target.value) {
-        const [h, m] = e.target.value.split(':').map(Number);
-        const b = point.actualPassage ? new Date(point.actualPassage) : new Date();
-        upd({
-          actualPassage: new Date(b.getFullYear(), b.getMonth(), b.getDate(), h, m).toISOString()
-        });
-      }
-    },
-    placeholder: "\u624B\u52D5\u5165\u529B"
+      if (!e.target.value) return;
+      const [h, m] = e.target.value.split(':').map(Number);
+      const base = point.actualPassage ? new Date(point.actualPassage) : trip.date ? new Date(trip.date) : new Date();
+      upd({
+        actualPassage: new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, m).toISOString()
+      });
+    }
   }), point.actualPassage && /*#__PURE__*/React.createElement(Btn, {
     xs: true,
     onClick: () => upd({
       actualPassage: null
     })
-  }, "\u2715"))) : /*#__PURE__*/React.createElement("div", {
+  }, "\u2715")))) : /*#__PURE__*/React.createElement("div", {
     className: isDep || isArr ? "" : "g2"
   }, !isDep && /*#__PURE__*/React.createElement("div", {
     className: "time-box",
@@ -2590,39 +2619,61 @@ function PointDetail({
     },
     onClick: () => stamp("actualArrival")
   }, "\u25BC \u4ECA\u3059\u3050\u6253\u523B"), /*#__PURE__*/React.createElement("div", {
-    className: "row",
     style: {
       marginTop: 6,
-      gap: 6
+      display: "flex",
+      flexDirection: "column",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "inp",
+    style: {
+      textAlign: "center",
+      fontSize: 12
+    },
+    value: point.actualArrival ? ld(point.actualArrival) : trip.date || "",
+    onChange: e => {
+      if (!e.target.value) return;
+      const [y, mo, d] = e.target.value.split('-').map(Number);
+      const ex = point.actualArrival ? new Date(point.actualArrival) : new Date();
+      const t = new Date(y, mo - 1, d, ex.getHours(), ex.getMinutes()).toISOString();
+      const ch = {
+        actualArrival: t
+      };
+      if (point.actualDeparture) ch.stayDuration = stayMin(t, point.actualDeparture);
+      upd(ch);
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 4
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: "time",
-    className: "inp",
+    className: "inp flex1",
     style: {
-      flex: 1,
       textAlign: "center"
     },
     value: fmtTime(point.actualArrival) === "--:--" ? "" : fmtTime(point.actualArrival),
     onChange: e => {
-      if (e.target.value) {
-        const [h, m] = e.target.value.split(':').map(Number);
-        const b = point.actualArrival ? new Date(point.actualArrival) : new Date();
-        const t = new Date(b.getFullYear(), b.getMonth(), b.getDate(), h, m).toISOString();
-        const changes = {
-          actualArrival: t
-        };
-        if (point.actualDeparture) changes.stayDuration = stayMin(t, point.actualDeparture);
-        upd(changes);
-      }
-    },
-    placeholder: "\u624B\u52D5\u5165\u529B"
+      if (!e.target.value) return;
+      const [h, m] = e.target.value.split(':').map(Number);
+      const base = point.actualArrival ? new Date(point.actualArrival) : trip.date ? new Date(trip.date) : new Date();
+      const t = new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, m).toISOString();
+      const ch = {
+        actualArrival: t
+      };
+      if (point.actualDeparture) ch.stayDuration = stayMin(t, point.actualDeparture);
+      upd(ch);
+    }
   }), point.actualArrival && /*#__PURE__*/React.createElement(Btn, {
     xs: true,
     onClick: () => upd({
       actualArrival: null,
       stayDuration: null
     })
-  }, "\u2715"))), !isArr && /*#__PURE__*/React.createElement("div", {
+  }, "\u2715")))), !isArr && /*#__PURE__*/React.createElement("div", {
     className: "time-box"
   }, /*#__PURE__*/React.createElement("div", {
     className: "time-lbl"
@@ -2640,39 +2691,63 @@ function PointDetail({
     },
     onClick: () => stamp("actualDeparture")
   }, "\u25B2 \u4ECA\u3059\u3050\u6253\u523B"), /*#__PURE__*/React.createElement("div", {
-    className: "row",
     style: {
       marginTop: 6,
-      gap: 6
+      display: "flex",
+      flexDirection: "column",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "inp",
+    style: {
+      textAlign: "center",
+      fontSize: 12
+    },
+    value: point.actualDeparture ? ld(point.actualDeparture) : point.actualArrival ? ld(point.actualArrival) : trip.date || "",
+    onChange: e => {
+      if (!e.target.value) return;
+      const [y, mo, d] = e.target.value.split('-').map(Number);
+      const ex = point.actualDeparture ? new Date(point.actualDeparture) : new Date();
+      const t = new Date(y, mo - 1, d, ex.getHours(), ex.getMinutes()).toISOString();
+      const ch = {
+        actualDeparture: t
+      };
+      if (point.actualArrival) ch.stayDuration = stayMin(point.actualArrival, t);
+      upd(ch);
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 4
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: "time",
-    className: "inp",
+    className: "inp flex1",
     style: {
-      flex: 1,
       textAlign: "center"
     },
     value: fmtTime(point.actualDeparture) === "--:--" ? "" : fmtTime(point.actualDeparture),
     onChange: e => {
-      if (e.target.value) {
-        const [h, m] = e.target.value.split(':').map(Number);
-        const b = point.actualDeparture ? new Date(point.actualDeparture) : new Date();
-        const t = new Date(b.getFullYear(), b.getMonth(), b.getDate(), h, m).toISOString();
-        const changes = {
-          actualDeparture: t
-        };
-        if (point.actualArrival) changes.stayDuration = stayMin(point.actualArrival, t);
-        upd(changes);
-      }
-    },
-    placeholder: "\u624B\u52D5\u5165\u529B"
+      if (!e.target.value) return;
+      const [h, m] = e.target.value.split(':').map(Number);
+      const base = point.actualDeparture ? new Date(point.actualDeparture) : point.actualArrival ? new Date(point.actualArrival) : trip.date ? new Date(trip.date) : new Date();
+      let t = new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, m);
+      if (point.actualArrival && t <= new Date(point.actualArrival)) t = new Date(t.getTime() + 86400000);
+      const iso = t.toISOString();
+      const ch = {
+        actualDeparture: iso
+      };
+      if (point.actualArrival) ch.stayDuration = stayMin(point.actualArrival, iso);
+      upd(ch);
+    }
   }), point.actualDeparture && /*#__PURE__*/React.createElement(Btn, {
     xs: true,
     onClick: () => upd({
       actualDeparture: null,
       stayDuration: null
     })
-  }, "\u2715")))), stay !== null && /*#__PURE__*/React.createElement("div", {
+  }, "\u2715"))))), stay !== null && /*#__PURE__*/React.createElement("div", {
     className: "stay-bar"
   }, /*#__PURE__*/React.createElement("span", {
     style: {
