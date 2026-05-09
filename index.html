@@ -312,6 +312,32 @@ const loadTravelers = async () => {
 const saveTravelers = async list => {
   await fsaveTvs(list);
 };
+const pmDoc = () => teamRef().collection('meta').doc('packingMaster');
+const loadPackingMaster = async () => {
+  try {
+    const snap = await pmDoc().get();
+    return snap.data() || {
+      bags: []
+    };
+  } catch {
+    return {
+      bags: []
+    };
+  }
+};
+const savePackingMaster = async m => {
+  await pmDoc().set(m);
+};
+const masterToChecklist = master => ({
+  bags: (master.bags || []).map(b => ({
+    ...b,
+    items: (b.items || []).map(i => ({
+      ...i,
+      checked: false,
+      master: true
+    }))
+  }))
+});
 const SETUP_CSS = `.setup-wrap{min-height:100vh;background:#0c0f1a;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:'Hiragino Kaku Gothic ProN',sans-serif;color:#e2e8f8}.setup-card{background:#12151e;border:1px solid #252d42;border-radius:14px;padding:24px;width:100%;max-width:420px}.setup-title{font-size:22px;font-weight:800;margin-bottom:4px;text-align:center}.setup-sub{font-size:13px;color:#6b7594;text-align:center;margin-bottom:20px}.setup-label{display:block;font-size:11px;color:#6b7594;margin-bottom:5px;font-weight:700;text-transform:uppercase}.setup-inp{width:100%;background:#0d1018;border:1px solid #2e3548;border-radius:8px;color:#e2e8f8;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px}.setup-inp:focus{border-color:#3b82f6}.setup-btn{width:100%;padding:11px;background:#2563eb;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px}.setup-btn:disabled{opacity:.4}.setup-err{color:#f87171;font-size:13px;margin-top:8px;text-align:center}`;
 const BAKED_CONFIG = {
   "apiKey": "AIzaSyDombC-mDxM6TC6Eo1Zqu33FkWdagt1xm4",
@@ -1118,6 +1144,412 @@ function TravelerPicker({
     }
   }, "\uFF0B \u30DE\u30B9\u30BF\u7BA1\u7406"));
 }
+function PackingMasterModal({
+  onClose
+}) {
+  const [master, setMaster] = useState({
+    bags: []
+  });
+  const [newBag, setNewBag] = useState("");
+  const [newItem, setNewItem] = useState({});
+  const [editBagId, setEditBagId] = useState(null);
+  const [editBagName, setEditBagName] = useState("");
+  const [confirmBagId, setConfirmBagId] = useState(null);
+  useEffect(() => {
+    loadPackingMaster().then(setMaster);
+  }, []);
+  const save = async m => {
+    setMaster(m);
+    await savePackingMaster(m);
+  };
+  const addBag = () => {
+    if (!newBag.trim()) return;
+    save({
+      ...master,
+      bags: [...master.bags, {
+        id: uid(),
+        name: newBag.trim(),
+        items: []
+      }]
+    });
+    setNewBag("");
+  };
+  const renameBag = id => {
+    save({
+      ...master,
+      bags: master.bags.map(b => b.id === id ? {
+        ...b,
+        name: editBagName
+      } : b)
+    });
+    setEditBagId(null);
+  };
+  const removeBag = id => {
+    save({
+      ...master,
+      bags: master.bags.filter(b => b.id !== id)
+    });
+    setConfirmBagId(null);
+  };
+  const addItem = bagId => {
+    const text = (newItem[bagId] || "").trim();
+    if (!text) return;
+    save({
+      ...master,
+      bags: master.bags.map(b => b.id === bagId ? {
+        ...b,
+        items: [...b.items, {
+          id: uid(),
+          text
+        }]
+      } : b)
+    });
+    setNewItem({
+      ...newItem,
+      [bagId]: ""
+    });
+  };
+  const removeItem = (bagId, itemId) => {
+    save({
+      ...master,
+      bags: master.bags.map(b => b.id === bagId ? {
+        ...b,
+        items: b.items.filter(i => i.id !== itemId)
+      } : b)
+    });
+  };
+  return /*#__PURE__*/React.createElement(Modal, {
+    title: "\uD83C\uDF92 \u6301\u3061\u7269\u30DE\u30B9\u30BF",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "inp flex1",
+    value: newBag,
+    onChange: e => setNewBag(e.target.value),
+    placeholder: "\u30D0\u30C3\u30B0\u30FB\u30AB\u30C6\u30B4\u30EA\u540D\uFF08\u4F8B: \u8ECA\u8F09\u54C1\uFF09",
+    onKeyDown: e => e.key === "Enter" && addBag(),
+    autoFocus: true
+  }), /*#__PURE__*/React.createElement(Btn, {
+    cls: "btn-blue",
+    sm: true,
+    onClick: addBag,
+    disabled: !newBag.trim()
+  }, "\u8FFD\u52A0")), master.bags.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty",
+    style: {
+      padding: 20
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13
+    }
+  }, "\u30D0\u30C3\u30B0\u3092\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044")), master.bags.map(bag => /*#__PURE__*/React.createElement("div", {
+    key: bag.id,
+    className: "card",
+    style: {
+      marginBottom: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 12px",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      borderBottom: "1px solid var(--border)"
+    }
+  }, editBagId === bag.id ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    className: "inp flex1",
+    value: editBagName,
+    onChange: e => setEditBagName(e.target.value),
+    onKeyDown: e => e.key === "Enter" && renameBag(bag.id),
+    autoFocus: true,
+    style: {
+      fontSize: 13
+    }
+  }), /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    cls: "btn-blue",
+    onClick: () => renameBag(bag.id)
+  }, "\u4FDD\u5B58"), /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    onClick: () => setEditBagId(null)
+  }, "\u2715")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      flex: 1
+    }
+  }, "\uD83C\uDF92 ", bag.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text3)"
+    }
+  }, bag.items.length, "\u70B9"), /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    onClick: () => {
+      setEditBagId(bag.id);
+      setEditBagName(bag.name);
+    }
+  }, "\u270F"), confirmBagId === bag.id ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    cls: "btn-red",
+    onClick: () => removeBag(bag.id)
+  }, "\u524A\u9664"), /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    onClick: () => setConfirmBagId(null)
+  }, "\u3044\u3044\u3048")) : /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    onClick: () => setConfirmBagId(bag.id)
+  }, "\uD83D\uDDD1"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 12px"
+    }
+  }, bag.items.map(item => /*#__PURE__*/React.createElement("div", {
+    key: item.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "4px 0",
+      borderBottom: "1px solid var(--border)"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 13
+    }
+  }, "\u25A1 ", item.text), /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    onClick: () => removeItem(bag.id, item.id)
+  }, "\u2715"))), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      marginTop: 6,
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "inp flex1",
+    style: {
+      fontSize: 12
+    },
+    value: newItem[bag.id] || "",
+    onChange: e => setNewItem({
+      ...newItem,
+      [bag.id]: e.target.value
+    }),
+    placeholder: "\u30A2\u30A4\u30C6\u30E0\u3092\u8FFD\u52A0...",
+    onKeyDown: e => e.key === "Enter" && addItem(bag.id)
+  }), /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    cls: "btn-blue",
+    onClick: () => addItem(bag.id),
+    disabled: !(newItem[bag.id] || "").trim()
+  }, "\uFF0B"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text3)",
+      textAlign: "center"
+    }
+  }, "\u65B0\u898F\u51FA\u5F35\u4F5C\u6210\u6642\u306B\u3053\u306E\u30EA\u30B9\u30C8\u304C\u81EA\u52D5\u30B3\u30D4\u30FC\u3055\u308C\u307E\u3059")));
+}
+function TripChecklist({
+  checklist,
+  onUpdate,
+  onOpenMaster
+}) {
+  const [newItem, setNewItem] = useState({});
+  if (!checklist || !checklist.bags || checklist.bags.length === 0) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px",
+      textAlign: "center",
+      color: "var(--text3)",
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("p", null, "\u6301\u3061\u7269\u30EA\u30B9\u30C8\u304C\u3042\u308A\u307E\u305B\u3093"), /*#__PURE__*/React.createElement("button", {
+    onClick: onOpenMaster,
+    style: {
+      background: "none",
+      border: "none",
+      color: "var(--accent)",
+      fontSize: 13,
+      cursor: "pointer",
+      marginTop: 6,
+      textDecoration: "underline"
+    }
+  }, "\u30DE\u30B9\u30BF\u3092\u767B\u9332\u3057\u3066\u518D\u9069\u7528"));
+  const toggle = (bagId, itemId) => {
+    onUpdate({
+      ...checklist,
+      bags: checklist.bags.map(b => b.id === bagId ? {
+        ...b,
+        items: b.items.map(i => i.id === itemId ? {
+          ...i,
+          checked: !i.checked
+        } : i)
+      } : b)
+    });
+  };
+  const addItem = bagId => {
+    const text = (newItem[bagId] || "").trim();
+    if (!text) return;
+    onUpdate({
+      ...checklist,
+      bags: checklist.bags.map(b => b.id === bagId ? {
+        ...b,
+        items: [...b.items, {
+          id: uid(),
+          text,
+          checked: false,
+          master: false
+        }]
+      } : b)
+    });
+    setNewItem({
+      ...newItem,
+      [bagId]: ""
+    });
+  };
+  const removeItem = (bagId, itemId) => {
+    onUpdate({
+      ...checklist,
+      bags: checklist.bags.map(b => b.id === bagId ? {
+        ...b,
+        items: b.items.filter(i => i.id !== itemId)
+      } : b)
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 0
+    }
+  }, checklist.bags.map((bag, bi) => {
+    const total = bag.items.length;
+    const checked = bag.items.filter(i => i.checked).length;
+    const allDone = total > 0 && checked === total;
+    return /*#__PURE__*/React.createElement("div", {
+      key: bag.id,
+      style: {
+        borderBottom: bi < checklist.bags.length - 1 ? "1px solid var(--border)" : "none"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "8px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: "var(--surf2)"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: 13,
+        flex: 1
+      }
+    }, "\uD83C\uDF92 ", bag.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: allDone ? "var(--green)" : "var(--text3)",
+        fontWeight: 700
+      }
+    }, checked, "/", total), allDone && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--green)"
+      }
+    }, "\u2713 \u5B8C\u4E86")), bag.items.map(item => /*#__PURE__*/React.createElement("div", {
+      key: item.id,
+      onClick: () => toggle(bag.id, item.id),
+      style: {
+        padding: "9px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        cursor: "pointer",
+        borderTop: "1px solid var(--border)",
+        background: item.checked ? "rgba(74,222,128,.04)" : "transparent",
+        transition: "background .12s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 18,
+        height: 18,
+        borderRadius: 4,
+        border: `2px solid ${item.checked ? "var(--green)" : "var(--border2)"}`,
+        background: item.checked ? "var(--green)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        transition: "all .15s"
+      }
+    }, item.checked && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#0c0f1a",
+        fontSize: 12,
+        fontWeight: 900,
+        lineHeight: 1
+      }
+    }, "\u2713")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 13,
+        textDecoration: item.checked ? "line-through" : "none",
+        color: item.checked ? "var(--text3)" : "var(--text)"
+      }
+    }, item.text), !item.master && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        background: "rgba(251,146,60,.15)",
+        color: "#fb923c",
+        padding: "1px 5px",
+        borderRadius: 4
+      }
+    }, "\u4ECA\u56DE"), /*#__PURE__*/React.createElement("span", {
+      onClick: e => {
+        e.stopPropagation();
+        removeItem(bag.id, item.id);
+      },
+      style: {
+        color: "var(--text3)",
+        fontSize: 14,
+        padding: "0 2px",
+        cursor: "pointer"
+      }
+    }, "\u2715"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "6px 14px 10px",
+        display: "flex",
+        gap: 6
+      },
+      onClick: e => e.stopPropagation()
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "inp flex1",
+      style: {
+        fontSize: 12
+      },
+      value: newItem[bag.id] || "",
+      onChange: e => setNewItem({
+        ...newItem,
+        [bag.id]: e.target.value
+      }),
+      placeholder: "\u4ECA\u56DE\u3060\u3051\u8FFD\u52A0...",
+      onKeyDown: e => e.key === "Enter" && addItem(bag.id)
+    }), /*#__PURE__*/React.createElement(Btn, {
+      xs: true,
+      cls: "btn-ghost",
+      onClick: () => addItem(bag.id),
+      disabled: !(newItem[bag.id] || "").trim()
+    }, "\uFF0B")));
+  }));
+}
 function TripList({
   trips,
   travelers,
@@ -1125,6 +1557,7 @@ function TripList({
   onSelect,
   onRemove,
   onOpenMaster,
+  onOpenPacking,
   onExportAll,
   onImport
 }) {
@@ -1272,6 +1705,9 @@ function TripList({
     sm: true,
     onClick: onOpenMaster
   }, "\uD83D\uDC64 \u51FA\u5F35\u8005"), /*#__PURE__*/React.createElement(Btn, {
+    sm: true,
+    onClick: onOpenPacking
+  }, "\uD83C\uDF92 \u6301\u3061\u7269"), /*#__PURE__*/React.createElement(Btn, {
     sm: true,
     onClick: onImport
   }, "\u2B07 \u8AAD\u8FBC"), trips.length > 0 && /*#__PURE__*/React.createElement(Btn, {
@@ -1645,6 +2081,7 @@ function TripDetail({
     date: trip.date
   });
   const [confirmPtId, setConfirmPtId] = useState(null);
+  const [showPacking, setShowPacking] = useState(false);
   const addPoint = f => {
     const p = {
       id: uid(),
@@ -1865,6 +2302,77 @@ function TripDetail({
     travelers: travelers,
     onOpenMaster: onOpenMaster
   }))), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "10px 14px",
+      borderBottom: "1px solid var(--border)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: ".1em",
+      color: "var(--text3)",
+      textTransform: "uppercase"
+    }
+  }, "\uD83C\uDF92 \u6301\u3061\u7269\u30C1\u30A7\u30C3\u30AF\u30EA\u30B9\u30C8", trip.checklist?.bags?.length > 0 && (() => {
+    const total = trip.checklist.bags.reduce((s, b) => s + b.items.length, 0);
+    const done = trip.checklist.bags.reduce((s, b) => s + b.items.filter(i => i.checked).length, 0);
+    return /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: 8,
+        color: done === total && total > 0 ? "var(--green)" : "var(--text3)",
+        fontWeight: 700
+      }
+    }, done, "/", total);
+  })()), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 5
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    cls: "btn-ghost",
+    onClick: async () => {
+      const m = await loadPackingMaster();
+      const cl = masterToChecklist(m);
+      // Merge: keep existing checked state and trip-only items
+      const merged = {
+        bags: cl.bags.map(nb => {
+          const ob = (trip.checklist?.bags || []).find(b => b.id === nb.id);
+          if (!ob) return nb;
+          return {
+            ...nb,
+            items: nb.items.map(ni => {
+              const oi = ob.items.find(i => i.id === ni.id);
+              return oi ? {
+                ...ni,
+                checked: oi.checked
+              } : ni;
+            }).concat(ob.items.filter(i => !i.master))
+          };
+        }).concat((trip.checklist?.bags || []).filter(ob => !cl.bags.find(nb => nb.id === ob.id)))
+      };
+      onUpdate({
+        ...trip,
+        checklist: merged
+      });
+    }
+  }, "\uD83D\uDD04 \u518D\u9069\u7528"), /*#__PURE__*/React.createElement(Btn, {
+    xs: true,
+    onClick: () => setShowPacking(v => !v)
+  }, showPacking ? "▲ 閉じる" : "▼ 開く"))), showPacking && /*#__PURE__*/React.createElement(TripChecklist, {
+    checklist: trip.checklist,
+    onUpdate: cl => onUpdate({
+      ...trip,
+      checklist: cl
+    }),
+    onOpenMaster: onOpenMaster
+  })), /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3033,6 +3541,7 @@ function MainApp({
   onReset
 }) {
   const [trips, setTrips] = useState([]);
+  const [showPackingMaster, setShowPackingMaster] = useState(false);
   const [travelers, setTravelers] = useState([]);
   const [screen, setScreen] = useState("list");
   const [tripId, setTripId] = useState(null);
