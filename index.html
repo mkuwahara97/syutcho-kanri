@@ -4,7 +4,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="出張管理">
 <title>出張報告書管理</title>
 <link rel="apple-touch-icon" id="apple-icon"><link rel="icon" id="fav-icon"><link rel="manifest" id="manifest-link">
-<style>*{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}html,body{height:100%;margin:0;background:#0c0f1a;overscroll-behavior:none}#root{}.hdr{padding-top:max(13px,env(safe-area-inset-top))!important}.scrl{padding-bottom:env(safe-area-inset-bottom)}input,select,textarea{font-size:16px!important}</style>
+<style>*{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}html,body{height:100%;margin:0;background:#0c0f1a;overscroll-behavior:none}html{height:-webkit-fill-available}body{min-height:-webkit-fill-available}#root{height:100%;height:-webkit-fill-available}.hdr{padding-top:env(safe-area-inset-top)!important;min-height:calc(44px + env(safe-area-inset-top))}.scrl{padding-bottom:max(12px,env(safe-area-inset-bottom))}input,select,textarea{font-size:16px!important}</style>
 </head><body><div id="root"></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -442,14 +442,14 @@ const css = `
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0c0f1a;--surf:#121624;--surf2:#1a1f2e;--surf3:#212840;--border:#252d42;--border2:#2e3a52;--text:#e2e8f8;--text2:#8b95b0;--text3:#4a5570;--accent:#3b82f6;--green:#4ade80;--amber:#fbbf24;--red:#f87171;--radius:10px}
 body,html{height:100%;background:var(--bg);overflow:hidden}
-#root{height:100vh;display:flex;flex-direction:column;background:var(--bg);font-family:'Hiragino Kaku Gothic ProN','Noto Sans CJK JP','Meiryo',system-ui,sans-serif;font-size:14px;color:var(--text);overflow:hidden}
+#root{height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--bg);font-family:'Hiragino Kaku Gothic ProN','Noto Sans CJK JP','Meiryo',system-ui,sans-serif;font-size:14px;color:var(--text);overflow:hidden}
 .scrl{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .scrl::-webkit-scrollbar{width:4px}
 .scrl::-webkit-scrollbar-track{background:transparent}
 .scrl::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 .pad{padding:12px 14px}
 .hdr{background:var(--surf);border-bottom:1px solid var(--border);padding:13px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;position:relative;z-index:10}
-.hdr h1{font-size:15px;font-weight:700;letter-spacing:.03em;flex:1}
+.hdr h1{font-size:14px;font-weight:700;letter-spacing:.03em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card{background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px}
 .card-hdr{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
 .card-body{padding:14px}
