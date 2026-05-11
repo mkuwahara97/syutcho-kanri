@@ -8,12 +8,7 @@
 </head><body><div id="root"></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script>
-const _s=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='#0c0f1a'/><text x='256' y='340' text-anchor='middle' font-size='300' font-family='serif'>✈</text></svg>`;
-const _i='data:image/svg+xml,'+encodeURIComponent(_s);document.getElementById('apple-icon').href=_i;document.getElementById('fav-icon').href=_i;
-const _m=new Blob([JSON.stringify({name:"出張報告書管理",short_name:"出張管理",start_url:"./",display:"standalone",background_color:"#0c0f1a",theme_color:"#0c0f1a",lang:"ja",icons:[{src:_i,sizes:"512x512",type:"image/svg+xml",purpose:"maskable"}]})],{type:"application/json"});document.getElementById("manifest-link").href=URL.createObjectURL(_m);
-window._lsMedia={get:(k)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
-</script>
+<script>const _s=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='#0c0f1a'/><text x='256' y='340' text-anchor='middle' font-size='300' font-family='serif'>✈</text></svg>`;const _i='data:image/svg+xml,'+encodeURIComponent(_s);document.getElementById('apple-icon').href=_i;document.getElementById('fav-icon').href=_i;const _m=new Blob([JSON.stringify({name:"出張報告書管理",short_name:"出張管理",start_url:"./",display:"standalone",background_color:"#0c0f1a",theme_color:"#0c0f1a",lang:"ja",icons:[{src:_i,sizes:"512x512",type:"image/svg+xml",purpose:"maskable"}]})],{type:"application/json"});document.getElementById('manifest-link').href=URL.createObjectURL(_m);window._lsMedia={get:(k)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};</script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
@@ -245,16 +240,9 @@ const openNav = ({
   lng
 } = {}) => {
   const dest = lat && lng ? `${lat},${lng}` : encodeURIComponent(address || name || "");
-  const base = `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(p => window.open(`https://www.google.com/maps/dir/?api=1&origin=${p.coords.latitude},${p.coords.longitude}&destination=${dest}&travelmode=driving`, "_blank"), () => window.open(base, "_blank"), {
-      timeout: 4000,
-      enableHighAccuracy: false,
-      maximumAge: 60000
-    });
-  } else {
-    window.open(base, "_blank");
-  }
+  // 出発地なしで開く → GoogleマップがGPSで現在地を自動設定
+  // ※ iOS Safariは非同期コールバック内のwindow.openをブロックするため
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`, '_blank');
 };
 const loadMedia = async pid => window._lsMedia.get(`media:${pid}`) || {
   photos: [],
@@ -2462,8 +2450,10 @@ function TripDetail({
       className: "picon",
       style: {
         background: pt?.bg,
-        flexShrink: 0
-      }
+        flexShrink: 0,
+        cursor: "pointer"
+      },
+      onClick: () => onSelectPoint(p.id)
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         color: pt?.color
@@ -2471,8 +2461,10 @@ function TripDetail({
     }, pt?.icon)), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
-        minWidth: 0
-      }
+        minWidth: 0,
+        cursor: "pointer"
+      },
+      onClick: () => onSelectPoint(p.id)
     }, /*#__PURE__*/React.createElement("div", {
       className: "row",
       style: {
@@ -2501,9 +2493,17 @@ function TripDetail({
         flexWrap: "wrap",
         alignItems: "center"
       }
-    }, p.plannedArrival && /*#__PURE__*/React.createElement("span", {
+    }, isWp && p.plannedArrival && /*#__PURE__*/React.createElement("span", {
       className: "mono"
-    }, "\u4E88\u5B9A ", p.plannedArrival), p.actualArrival && /*#__PURE__*/React.createElement("span", {
+    }, "\u4E88\u5B9A\u901A\u904E ", p.plannedArrival), isDep && p.plannedDeparture && /*#__PURE__*/React.createElement("span", {
+      className: "mono"
+    }, "\u4E88\u5B9A\u767A ", p.plannedDeparture), isArr && p.plannedArrival && /*#__PURE__*/React.createElement("span", {
+      className: "mono"
+    }, "\u4E88\u5B9A\u7740 ", p.plannedArrival), !isWp && !isDep && !isArr && p.plannedArrival && /*#__PURE__*/React.createElement("span", {
+      className: "mono"
+    }, "\u4E88\u5B9A\u7740 ", p.plannedArrival), !isWp && !isDep && !isArr && p.plannedDeparture && /*#__PURE__*/React.createElement("span", {
+      className: "mono"
+    }, "\u4E88\u5B9A\u767A ", p.plannedDeparture), p.actualArrival && /*#__PURE__*/React.createElement("span", {
       className: "mono",
       style: {
         color: "var(--green)"
@@ -2578,7 +2578,8 @@ function TripDetail({
         color: "var(--text3)",
         fontSize: 16,
         cursor: "pointer",
-        alignSelf: "center"
+        alignSelf: "center",
+        display: "none"
       },
       onClick: () => onSelectPoint(p.id)
     }, "\u203A"))), /*#__PURE__*/React.createElement("div", {
@@ -2691,7 +2692,15 @@ function TripDetail({
         padding: "1px 5px",
         opacity: .7
       }
-    }, "\u2715"))), i < pts.length - 1 && /*#__PURE__*/React.createElement("div", {
+    }, "\u2715")), /*#__PURE__*/React.createElement(Btn, {
+      sm: true,
+      cls: "btn-ghost",
+      onClick: () => onSelectPoint(p.id),
+      style: {
+        marginLeft: "auto",
+        gap: 4
+      }
+    }, "\uD83D\uDCF7 \u5199\u771F\u30FB\u9332\u97F3\u30FB\u30E1\u30E2")), i < pts.length - 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         width: 2,
         height: 12,
@@ -3868,5 +3877,4 @@ function MainApp({
   })));
 }
 
-const root=ReactDOM.createRoot(document.getElementById("root"));root.render(React.createElement(App));
-</script></body></html>
+const root=ReactDOM.createRoot(document.getElementById("root"));root.render(React.createElement(App));</script></body></html>
